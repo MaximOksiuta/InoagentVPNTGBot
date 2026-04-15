@@ -28,13 +28,20 @@ class TelegramApiClient(
         return payload.result
     }
 
-    fun sendMessage(chatId: Long, text: String) {
+    fun sendMessage(chatId: Long, text: String, replyMarkup: kotlinx.serialization.json.JsonElement? = null) {
         splitTelegramText(text).forEach { chunk ->
-            val request = TelegramSendMessageRequest(chatId = chatId, text = chunk)
+            val request = TelegramSendMessageRequest(chatId = chatId, text = chunk, replyMarkup = replyMarkup)
             val response = postJson("/sendMessage", json.encodeToString(request))
             val payload = json.decodeFromString<TelegramOkEnvelope>(response)
             check(payload.ok) { payload.description ?: "Telegram sendMessage failed" }
         }
+    }
+
+    fun answerCallbackQuery(callbackQueryId: String, text: String? = null) {
+        val request = TelegramAnswerCallbackQueryRequest(callbackQueryId = callbackQueryId, text = text)
+        val response = postJson("/answerCallbackQuery", json.encodeToString(request))
+        val payload = json.decodeFromString<TelegramOkEnvelope>(response)
+        check(payload.ok) { payload.description ?: "Telegram answerCallbackQuery failed" }
     }
 
     fun sendDocument(chatId: Long, filename: String, bytes: ByteArray, caption: String? = null) {

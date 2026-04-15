@@ -2,6 +2,7 @@ package tgbot
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class RegisterRequest(
@@ -132,8 +133,9 @@ data class ErrorResponse(
 )
 
 @Serializable
-data class PersistedSessions(
-    val sessions: List<UserSession> = emptyList()
+data class PersistedBotState(
+    val sessions: List<UserSession> = emptyList(),
+    val flows: List<UserFlowState> = emptyList()
 )
 
 @Serializable
@@ -143,11 +145,18 @@ data class UserSession(
 )
 
 @Serializable
+data class UserFlowState(
+    val telegramUserId: Long,
+    val step: String,
+    val data: Map<String, String> = emptyMap()
+)
+
+@Serializable
 data class TelegramGetUpdatesRequest(
     val offset: Long? = null,
     val timeout: Int = 30,
     @SerialName("allowed_updates")
-    val allowedUpdates: List<String> = listOf("message")
+    val allowedUpdates: List<String> = listOf("message", "callback_query")
 )
 
 @Serializable
@@ -167,7 +176,9 @@ data class TelegramOkEnvelope(
 data class TelegramUpdate(
     @SerialName("update_id")
     val updateId: Long,
-    val message: TelegramMessage? = null
+    val message: TelegramMessage? = null,
+    @SerialName("callback_query")
+    val callbackQuery: TelegramCallbackQuery? = null
 )
 
 @Serializable
@@ -176,7 +187,8 @@ data class TelegramMessage(
     val messageId: Long,
     val from: TelegramUser? = null,
     val chat: TelegramChat,
-    val text: String? = null
+    val text: String? = null,
+    val contact: TelegramContact? = null
 )
 
 @Serializable
@@ -198,12 +210,41 @@ data class TelegramChat(
 )
 
 @Serializable
+data class TelegramContact(
+    @SerialName("phone_number")
+    val phoneNumber: String,
+    @SerialName("first_name")
+    val firstName: String? = null,
+    @SerialName("last_name")
+    val lastName: String? = null,
+    @SerialName("user_id")
+    val userId: Long? = null
+)
+
+@Serializable
+data class TelegramCallbackQuery(
+    val id: String,
+    val from: TelegramUser,
+    val message: TelegramMessage? = null,
+    val data: String? = null
+)
+
+@Serializable
 data class TelegramSendMessageRequest(
     @SerialName("chat_id")
     val chatId: Long,
     val text: String,
     @SerialName("disable_web_page_preview")
-    val disableWebPagePreview: Boolean = true
+    val disableWebPagePreview: Boolean = true,
+    @SerialName("reply_markup")
+    val replyMarkup: JsonElement? = null
+)
+
+@Serializable
+data class TelegramAnswerCallbackQueryRequest(
+    @SerialName("callback_query_id")
+    val callbackQueryId: String,
+    val text: String? = null
 )
 
 data class BinaryPayload(
