@@ -254,7 +254,7 @@ class VpnTelegramBot(
             chatId,
             buildString {
                 appendLine("Мои устройства:")
-                devices.forEach { appendLine("• #${it.id} ${it.name}") }
+                devices.forEach { appendLine("• ${it.name}") }
             },
             TelegramKeyboards.inline(*rows.toTypedArray())
         )
@@ -266,7 +266,7 @@ class VpnTelegramBot(
         telegramApi.sendMessage(
             chatId,
             buildString {
-                appendLine("Устройство #${device.id}")
+                appendLine("Устройство")
                 appendLine("Название: ${device.name}")
                 appendLine("Конфигов: ${device.configs.size}")
             },
@@ -292,7 +292,9 @@ class VpnTelegramBot(
                 data = mapOf("deviceId" to deviceId.toString())
             )
         )
-        telegramApi.sendMessage(chatId, "Отправь новое имя для устройства #$deviceId.", inlineBackKeyboard("dev:$deviceId"))
+        val session = requireSession(telegramUserId)
+        val device = backendApi.getDevice(session.phone, deviceId)
+        telegramApi.sendMessage(chatId, "Отправь новое имя для устройства ${device.name}.", inlineBackKeyboard("dev:$deviceId"))
     }
 
     private fun handleDeviceRenameName(chatId: Long, telegramUserId: Long, flow: UserFlowState, text: String?) {
@@ -302,7 +304,7 @@ class VpnTelegramBot(
         require(newName.isNotBlank()) { "Имя устройства не должно быть пустым." }
         val updated = backendApi.updateDevice(session.phone, deviceId, UpdateDeviceRequest(newName))
         sessionStore.clearFlow(telegramUserId)
-        telegramApi.sendMessage(chatId, "Устройство обновлено: #${updated.id} ${updated.name}")
+        telegramApi.sendMessage(chatId, "Устройство обновлено: ${updated.name}")
         showDevice(chatId, telegramUserId, updated.id)
     }
 
@@ -312,14 +314,15 @@ class VpnTelegramBot(
         require(name.isNotBlank()) { "Название устройства не должно быть пустым." }
         val created = backendApi.createDevice(session.phone, CreateDeviceRequest(name))
         sessionStore.clearFlow(telegramUserId)
-        telegramApi.sendMessage(chatId, "Устройство создано: #${created.id} ${created.name}")
+        telegramApi.sendMessage(chatId, "Устройство создано: ${created.name}")
         showDevices(chatId, telegramUserId)
     }
 
     private fun deleteDevice(chatId: Long, telegramUserId: Long, deviceId: Long) {
         val session = requireSession(telegramUserId)
+        val device = backendApi.getDevice(session.phone, deviceId)
         backendApi.deleteDevice(session.phone, deviceId)
-        telegramApi.sendMessage(chatId, "Устройство #$deviceId удалено.")
+        telegramApi.sendMessage(chatId, "Устройство ${device.name} удалено.")
         showDevices(chatId, telegramUserId)
     }
 
@@ -349,9 +352,10 @@ class VpnTelegramBot(
             listOf(InlineButton("⚙️ ${server.name} — ${server.location}", "gen:$deviceId:${server.id}"))
         } + listOf(listOf(InlineButton("⬅️ К устройству", "dev:$deviceId")))
 
+        val device = backendApi.getDevice(session.phone, deviceId)
         telegramApi.sendMessage(
             chatId,
-            "Выбери сервер для генерации конфига устройства #$deviceId.",
+            "Выбери сервер для генерации конфига устройства ${device.name}.",
             TelegramKeyboards.inline(*rows.toTypedArray())
         )
     }
@@ -359,10 +363,11 @@ class VpnTelegramBot(
     private fun handleGenerateConfig(chatId: Long, telegramUserId: Long, data: String) {
         val (_, deviceIdRaw, serverIdRaw) = data.split(':')
         val session = requireSession(telegramUserId)
+        telegramApi.sendMessage(chatId, "Генерирую конфиг, это может занять некоторое время.")
         val created = backendApi.generateConfig(session.phone, deviceIdRaw.toLong(), serverIdRaw.toLong())
         telegramApi.sendMessage(
             chatId,
-            "Конфиг создан: #${created.id} для ${created.serverName} (${created.serverLocation}).",
+            "Конфиг создан для ${created.serverName} (${created.serverLocation}).",
             TelegramKeyboards.inline(
                 listOf(InlineButton("📄 Открыть конфиг", "cfg:${deviceIdRaw}:${created.id}")),
                 listOf(InlineButton("⬅️ К устройству", "dev:$deviceIdRaw"))
@@ -374,17 +379,17 @@ class VpnTelegramBot(
         val session = requireSession(telegramUserId)
         val device = backendApi.getDevice(session.phone, deviceId)
         if (device.configs.isEmpty()) {
-            telegramApi.sendMessage(chatId, "У устройства #${device.id} пока нет конфигов.", inlineBackKeyboard("dev:$deviceId"))
+            telegramApi.sendMessage(chatId, "У устройства ${device.name} пока нет конфигов.", inlineBackKeyboard("dev:$deviceId"))
             return
         }
         val rows = device.configs.map { config ->
-            listOf(InlineButton("📄 #${config.id} ${config.serverName}", "cfg:${deviceId}:${config.id}"))
+            listOf(InlineButton("📄 ${config.serverName}", "cfg:${deviceId}:${config.id}"))
         } + listOf(listOf(InlineButton("⬅️ К устройству", "dev:$deviceId")))
         telegramApi.sendMessage(
             chatId,
             buildString {
-                appendLine("Конфиги устройства #${device.id} ${device.name}:")
-                device.configs.forEach { appendLine("• #${it.id} ${it.serverName} (${it.serverLocation})") }
+                appendLine("Конфиги устройства ${device.name}:")
+                device.configs.forEach { appendLine("• ${it.serverName} (${it.serverLocation})") }
             },
             TelegramKeyboards.inline(*rows.toTypedArray())
         )
@@ -396,7 +401,7 @@ class VpnTelegramBot(
         telegramApi.sendMessage(
             chatId,
             buildString {
-                appendLine("config #${config.id} — ${config.serverName} (${config.serverLocation})")
+                appendLine("Конфиг ${config.serverName} (${config.serverLocation})")
                 appendLine()
                 append(config.config)
             },
@@ -422,7 +427,7 @@ class VpnTelegramBot(
             chatId = chatId,
             filename = buildConfigFilename(config.serverLocation, device.name),
             bytes = payload.bytes,
-            caption = "config #${config.id} — ${config.serverName}"
+            caption = "Конфиг ${config.serverName}"
         )
     }
 
@@ -437,7 +442,7 @@ class VpnTelegramBot(
             chatId = chatId,
             filename = "config-$configId.png",
             bytes = payload.bytes,
-            caption = "QR для config #${config.id} — ${config.serverName}"
+            caption = "QR для конфига ${config.serverName}"
         )
     }
 
