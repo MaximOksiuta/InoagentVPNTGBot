@@ -10,12 +10,12 @@ import java.time.Duration
 import java.util.UUID
 
 class TelegramApiClient(
-    botToken: String
+    botToken: String,
+    private val apiBaseUrl: String = "https://api.telegram.org/bot$botToken"
 ) {
     private val httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(20))
         .build()
-    private val apiBaseUrl = "https://api.telegram.org/bot$botToken"
 
     fun getUpdates(offset: Long?, timeoutSeconds: Int): List<TelegramUpdate> {
         val request = TelegramGetUpdatesRequest(

@@ -39,7 +39,12 @@ class VpnTelegramBot(
     private fun handleMessage(chatId: Long, telegramUserId: Long, message: TelegramMessage) {
         val text = message.text?.trim()
         if (!text.isNullOrBlank() && text.startsWith("/")) {
+            if (text.substringBefore(' ').substringBefore('@').lowercase() == "/start" && text.substringAfter(' ', "") == "reset") {
+                requestPhone(chatId, telegramUserId, "reset_wait_contact", "Для сброса пароля отправь свой номер кнопкой Telegram")
+                return
+            }
             when (text.substringBefore(' ').substringBefore('@').lowercase()) {
+                "/reset" -> requestPhone(chatId, telegramUserId, "reset_wait_contact", "Для сброса пароля отправь свой номер кнопкой Telegram")
                 "/start", "/help", "/menu" -> {
                     sessionStore.clearFlow(telegramUserId)
                     sendHomeMenu(chatId, telegramUserId, "Главное меню")
@@ -88,6 +93,7 @@ class VpnTelegramBot(
         val data = callback.data.orEmpty()
 
         when {
+            data == "auth:reset" -> requestPhone(chatId, telegramUserId, "reset_wait_contact", "Для сброса пароля отправь свой номер кнопкой Telegram")
             data == Callbacks.HOME -> sendHomeMenu(chatId, telegramUserId)
             data == Callbacks.LOGIN_START -> requestPhone(chatId, telegramUserId, FlowSteps.LOGIN_WAIT_CONTACT, "Отправь свой номер телефона для входа.")
             data == Callbacks.REGISTER_START -> requestPhone(chatId, telegramUserId, FlowSteps.REGISTER_WAIT_CONTACT, "Отправь свой номер телефона для регистрации.")
@@ -150,6 +156,13 @@ class VpnTelegramBot(
             ?: error("Сначала выбери действие Вход или Регистрация.")
 
         when (flow.step) {
+            "reset_wait_contact" -> {
+                val ticket = backendApi.recovery(phone, telegramUserId)
+                sessionStore.clearFlow(telegramUserId)
+                telegramApi.sendMessage(chatId,
+                    "Номер подтверждён. Задай новый пароль на сайте: https://vpn.oksiuta.ru/reset-password#${ticket.token}\nСсылка действует 10 минут и работает один раз. Не пересылай её другим людям.",
+                    TelegramKeyboards.removeReplyKeyboard())
+            }
             FlowSteps.LOGIN_WAIT_CONTACT -> {
                 val currentUser = backendApi.getCurrentUser(phone)
                 sessionStore.put(UserSession(telegramUserId, phone))
@@ -738,7 +751,8 @@ class VpnTelegramBot(
                     listOf(
                         InlineButton("🔐 Войти", Callbacks.LOGIN_START),
                         InlineButton("📝 Регистрация", Callbacks.REGISTER_START)
-                    )
+                    ),
+                    listOf(InlineButton("Сбросить пароль", "auth:reset"))
                 )
             )
             return
@@ -755,6 +769,7 @@ class VpnTelegramBot(
             rows += listOf(InlineButton("🛠 Админ-панель", Callbacks.MENU_ADMIN))
         }
         rows += listOf(InlineButton("🚪 Выйти", Callbacks.LOGOUT))
+        rows += listOf(InlineButton("Сбросить пароль", "auth:reset"))
 
         telegramApi.sendMessage(
             chatId,
@@ -837,8 +852,9 @@ class VpnTelegramBot(
     }
 
     private fun normalizePhone(value: String): String {
-        val trimmed = value.trim()
-        return if (trimmed.startsWith("+")) trimmed else "+$trimmed"
+        var digits = value.filter { it in '0'..'9' }
+        if (digits.length == 11 && digits.startsWith("8")) digits = "7" + digits.drop(1)
+        return "+$digits"
     }
 }
 

@@ -5,6 +5,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 @Serializable
+data class RecoveryRequest(val phone: String, val telegramId: Long)
+@Serializable
+data class RecoveryTicket(val token: String)
+
+@Serializable
 data class RegisterRequest(
     val nickname: String,
     val phone: String,

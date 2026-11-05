@@ -23,6 +23,10 @@ class BackendApiClient(
     fun getCurrentUser(phone: String): CurrentUserResponse =
         sendJson("GET", "/api/auth/me", CurrentUserResponse.serializer(), phone = phone)
 
+    fun recovery(phone: String, telegramId: Long): RecoveryTicket =
+        sendJson("POST", "/api/auth/recovery/telegram", RecoveryTicket.serializer(), phone = phone,
+            body = RecoveryRequest(phone, telegramId), bodySerializer = RecoveryRequest.serializer())
+
     fun listDevices(phone: String): List<DeviceResponse> =
         sendJson("GET", "/api/devices", ListSerializer(DeviceResponse.serializer()), phone = phone)
 
