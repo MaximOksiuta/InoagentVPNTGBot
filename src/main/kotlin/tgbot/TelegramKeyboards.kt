@@ -15,7 +15,8 @@ object TelegramKeyboards {
                                 JsonObject(
                                     buildMap {
                                         put("text", JsonPrimitive(button.text))
-                                        put("callback_data", JsonPrimitive(button.callbackData))
+                                        if(button.url != null) put("url",JsonPrimitive(button.url))
+                                        else put("callback_data", JsonPrimitive(button.callbackData))
                                     }
                                 )
                             }
@@ -56,5 +57,6 @@ object TelegramKeyboards {
 
 data class InlineButton(
     val text: String,
-    val callbackData: String
+    val callbackData: String = "",
+    val url: String? = null
 )

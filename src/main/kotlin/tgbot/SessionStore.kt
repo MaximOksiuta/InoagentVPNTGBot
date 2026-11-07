@@ -25,6 +25,9 @@ class SessionStore(private val storageFile: Path) {
     fun get(telegramUserId: Long): UserSession? = sessions[telegramUserId]
 
     @Synchronized
+    fun allSessions(): List<UserSession> = sessions.values.toList()
+
+    @Synchronized
     fun put(session: UserSession) {
         sessions[session.telegramUserId] = session
         persist()

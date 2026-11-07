@@ -9,6 +9,12 @@ data class RecoveryRequest(val phone: String, val telegramId: Long)
 @Serializable
 data class RecoveryTicket(val token: String)
 
+@Serializable data class BotNotification(val id: Long,val serverId: Long,val serverName: String,val location: String,val phone: String,val telegramId: Long? = null)
+@Serializable data class DeliveryReport(val delivered: Boolean)
+@Serializable data class BatchRequest(val serverId: Long,val deviceIds: List<Long>? = null,val requestKey: String)
+@Serializable data class GenerationItem(val deviceId: Long,val state: String,val configId: Long? = null)
+@Serializable data class GenerationJob(val id: String,val serverId: Long,val serverName: String,val state: String,val items: List<GenerationItem>)
+
 @Serializable
 data class RegisterRequest(
     val nickname: String,

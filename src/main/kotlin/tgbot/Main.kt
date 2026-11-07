@@ -10,6 +10,12 @@ fun main() {
     val bot = VpnTelegramBot(telegramApi, backendApi, sessionStore)
 
     println("tg_bot started. API=${config.apiBaseUrl}, dataDir=${config.dataDir}")
+    thread(isDaemon=true,name="new-server-notifications") {
+        while(true) {
+            runCatching { bot.deliverNotifications() }.onFailure { System.err.println("Notification delivery will retry") }
+            Thread.sleep(30_000)
+        }
+    }
 
     var offset: Long? = null
     while (true) {

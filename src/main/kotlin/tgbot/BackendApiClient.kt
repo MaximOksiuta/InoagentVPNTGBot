@@ -23,6 +23,15 @@ class BackendApiClient(
     fun getCurrentUser(phone: String): CurrentUserResponse =
         sendJson("GET", "/api/auth/me", CurrentUserResponse.serializer(), phone = phone)
 
+    fun pendingNotifications(): List<BotNotification> = sendJson("GET", "/api/bot/notifications", ListSerializer(BotNotification.serializer()), phone = "")
+    fun reportNotification(id: Long, delivered: Boolean) {
+        val response=sendRaw("POST", "/api/bot/notifications/$id/delivery", "", DeliveryReport(delivered), DeliveryReport.serializer())
+        check(response.statusCode() in 200..299) { "Could not acknowledge notification" }
+    }
+    fun enqueue(phone: String,serverId: Long,deviceIds: List<Long>? = null): GenerationJob = sendJson("POST", "/api/generation/jobs", GenerationJob.serializer(), phone = phone,
+        body = BatchRequest(serverId,deviceIds,java.util.UUID.randomUUID().toString()), bodySerializer = BatchRequest.serializer())
+    fun generationJob(phone: String,id: String): GenerationJob = sendJson("GET", "/api/generation/jobs/$id", GenerationJob.serializer(), phone = phone)
+
     fun recovery(phone: String, telegramId: Long): RecoveryTicket =
         sendJson("POST", "/api/auth/recovery/telegram", RecoveryTicket.serializer(), phone = phone,
             body = RecoveryRequest(phone, telegramId), bodySerializer = RecoveryRequest.serializer())

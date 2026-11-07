@@ -5,6 +5,20 @@ class VpnTelegramBot(
     private val backendApi: BackendApiClient,
     private val sessionStore: SessionStore
 ) {
+    fun deliverNotifications() {
+        val sessions=sessionStore.allSessions().associateBy { it.phone }
+        for(notification in backendApi.pendingNotifications()) {
+            val chatId=notification.telegramId ?: sessions[notification.phone]?.telegramUserId
+            if(chatId==null) { backendApi.reportNotification(notification.id,false);continue }
+            val delivered=runCatching {
+                telegramApi.sendMessage(chatId,"Доступен новый VPN-сервер: ${notification.serverName} · ${notification.location}\nМожно выпустить недостающие конфигурации для всех своих устройств одним действием.",TelegramKeyboards.inline(
+                    listOf(InlineButton("Выпустить для всех моих устройств","bulk:${notification.serverId}")),
+                    listOf(InlineButton("Открыть конфигурации",url="https://vpn.oksiuta.ru/configurations?server=${notification.serverId}"))
+                ))
+            }.isSuccess
+            backendApi.reportNotification(notification.id,delivered)
+        }
+    }
     fun handleUpdate(update: TelegramUpdate) {
         update.callbackQuery?.let { callback ->
             val chatId = callback.message?.chat?.id ?: return
@@ -93,6 +107,15 @@ class VpnTelegramBot(
         val data = callback.data.orEmpty()
 
         when {
+            data.startsWith("bulk:") -> {
+                val session=requireSession(telegramUserId)
+                val job=backendApi.enqueue(session.phone,data.substringAfter(':').toLong())
+                showGenerationJob(chatId,job)
+            }
+            data.startsWith("job:") -> {
+                val session=requireSession(telegramUserId)
+                showGenerationJob(chatId,backendApi.generationJob(session.phone,data.substringAfter(':')))
+            }
             data == "auth:reset" -> requestPhone(chatId, telegramUserId, "reset_wait_contact", "Для сброса пароля отправь свой номер кнопкой Telegram")
             data == Callbacks.HOME -> sendHomeMenu(chatId, telegramUserId)
             data == Callbacks.LOGIN_START -> requestPhone(chatId, telegramUserId, FlowSteps.LOGIN_WAIT_CONTACT, "Отправь свой номер телефона для входа.")
@@ -376,15 +399,19 @@ class VpnTelegramBot(
     private fun handleGenerateConfig(chatId: Long, telegramUserId: Long, data: String) {
         val (_, deviceIdRaw, serverIdRaw) = data.split(':')
         val session = requireSession(telegramUserId)
-        telegramApi.sendMessage(chatId, "Генерирую конфиг, это может занять некоторое время.")
-        val created = backendApi.generateConfig(session.phone, deviceIdRaw.toLong(), serverIdRaw.toLong())
+        val job=backendApi.enqueue(session.phone,serverIdRaw.toLong(),listOf(deviceIdRaw.toLong()))
+        showGenerationJob(chatId,job)
+    }
+
+    private fun showGenerationJob(chatId: Long,job: GenerationJob) {
+        val ready=job.items.count { it.state=="done" || it.state=="skipped" }
+        val failed=job.items.count { it.state=="failed" }
+        val rows=mutableListOf(listOf(InlineButton("Обновить состояние","job:${job.id}")),listOf(InlineButton("Открыть конфигурации",url="https://vpn.oksiuta.ru/configurations?server=${job.serverId}")))
+        job.items.filter { it.configId!=null }.take(4).forEach { item -> rows += listOf(InlineButton("Конфигурация устройства #${item.deviceId}","cfg:${item.deviceId}:${item.configId}")) }
         telegramApi.sendMessage(
             chatId,
-            "Конфиг создан для ${created.serverName} (${created.serverLocation}).",
-            TelegramKeyboards.inline(
-                listOf(InlineButton("📄 Открыть конфиг", "cfg:${deviceIdRaw}:${created.id}")),
-                listOf(InlineButton("⬅️ К устройству", "dev:$deviceIdRaw"))
-            )
+            "${job.serverName}: готово или уже существует $ready из ${job.items.size}. Ошибок: $failed.\n" + if(job.state in listOf("queued","running")) "Задание в очереди. Можно продолжать пользоваться ботом" else "Задание завершено",
+            TelegramKeyboards.inline(*rows.toTypedArray())
         )
     }
 
