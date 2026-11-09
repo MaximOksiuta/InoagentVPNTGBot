@@ -16,6 +16,17 @@ fun main() {
             Thread.sleep(30_000)
         }
     }
+    thread(isDaemon = true, name = "server-status-alerts") {
+        val alerts = ServerStatusAlerts(config.dataDir.resolve("server-status-alerts.json"))
+        while (true) {
+            runCatching {
+                alerts.poll(backendApi.monitoringSnapshot(), sessionStore.allSessions()) { chatId, text ->
+                    telegramApi.sendMessage(chatId, text)
+                }
+            }.onFailure { System.err.println("Server monitoring will retry") }
+            Thread.sleep(30_000)
+        }
+    }
 
     var offset: Long? = null
     while (true) {

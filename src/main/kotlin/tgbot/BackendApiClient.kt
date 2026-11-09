@@ -55,6 +55,12 @@ class BackendApiClient(
     fun listServers(phone: String): List<ServerListItemResponse> =
         sendJson("GET", "/api/servers", ListSerializer(ServerListItemResponse.serializer()), phone = phone)
 
+    fun serverStatuses(phone: String): List<MonitoredServer> =
+        sendJson("GET", "/api/servers/status", ListSerializer(MonitoredServer.serializer()), phone = phone)
+
+    fun monitoringSnapshot(): MonitoringSnapshot =
+        sendJson("GET", "/api/bot/server-monitoring", MonitoringSnapshot.serializer(), phone = "")
+
     fun generateConfig(phone: String, deviceId: Long, serverId: Long): DeviceServerResponse =
         sendJson(
             "POST",

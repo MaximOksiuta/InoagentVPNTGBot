@@ -364,7 +364,7 @@ class VpnTelegramBot(
 
     private fun showServers(chatId: Long, telegramUserId: Long) {
         val session = requireSession(telegramUserId)
-        val servers = backendApi.listServers(session.phone)
+        val servers = backendApi.serverStatuses(session.phone)
         telegramApi.sendMessage(
             chatId,
             if (servers.isEmpty()) {
@@ -372,7 +372,10 @@ class VpnTelegramBot(
             } else {
                 buildString {
                     appendLine("Доступные серверы:")
-                    servers.forEach { appendLine("• #${it.id} ${it.name} — ${it.location}") }
+                    servers.forEach {
+                        appendLine("• #${it.id} ${it.name} — ${it.location}")
+                        appendLine("  ${it.statusText()}")
+                    }
                 }
             },
             inlineBackKeyboard(Callbacks.HOME)
@@ -558,7 +561,7 @@ class VpnTelegramBot(
 
     private fun showAdminServers(chatId: Long, telegramUserId: Long) {
         val session = requireAdminSession(telegramUserId)
-        val servers = backendApi.adminListServers(session.phone)
+        val servers = backendApi.serverStatuses(session.phone)
         val rows = servers.map { server ->
             listOf(InlineButton("🖥 #${server.id} ${server.name}", "asrv:${server.id}"))
         }.toMutableList()
@@ -566,7 +569,10 @@ class VpnTelegramBot(
         rows += listOf(InlineButton("⬅️ Назад", Callbacks.MENU_ADMIN))
         telegramApi.sendMessage(
             chatId,
-            if (servers.isEmpty()) "Серверов нет." else "Серверы:",
+            if (servers.isEmpty()) "Серверов нет." else buildString {
+                appendLine("Серверы · проверка с хоста сайта")
+                servers.forEach { appendLine("• #${it.id} ${it.name}: ${it.statusText()}") }
+            },
             TelegramKeyboards.inline(*rows.toTypedArray())
         )
     }
