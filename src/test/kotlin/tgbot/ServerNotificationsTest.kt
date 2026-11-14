@@ -14,7 +14,7 @@ class ServerNotificationsTest {
             val response=when {
                 path=="/api/bot/notifications" -> {
                     assertEquals("super-test",e.requestHeaders.getFirst("X-Super-Key"))
-                    val notifications=listOf(BotNotification(1,5,"London","UK","+79991112233",123),BotNotification(2,5,"London","UK","+79991112234"),BotNotification(3,5,"London","UK","+79991112235"))
+                    val notifications=listOf(BotNotification(1,5,"London","UK","+79991112233",123,"Обновите VPN-клиент."),BotNotification(2,5,"London","UK","+79991112234"),BotNotification(3,5,"London","UK","+79991112235"))
                     json.encodeToString(kotlinx.serialization.builtins.ListSerializer(BotNotification.serializer()),notifications.filter { it.id !in delivered })
                 }
                 path.endsWith("/delivery") -> {
@@ -32,6 +32,8 @@ class ServerNotificationsTest {
             val bot=VpnTelegramBot(TelegramApiClient("test",url),BackendApiClient(url,"super-test"),sessions)
             bot.deliverNotifications();assertEquals(listOf(123L,456L),messages.map {it.chatId});assertEquals(true,reports[1]);assertEquals(true,reports[2]);assertEquals(false,reports[3])
             assertTrue(messages.all {it.text.contains("London") && it.replyMarkup.toString().contains("bulk:5")})
+            assertTrue(messages.first().text.contains("Обновите VPN-клиент."))
+            assertFalse(messages.last().text.contains("Обновите VPN-клиент."))
             bot.deliverNotifications();assertEquals(2,messages.size)
         } finally {server.stop(0)}
     }

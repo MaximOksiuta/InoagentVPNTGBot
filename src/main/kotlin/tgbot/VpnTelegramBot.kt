@@ -11,7 +11,13 @@ class VpnTelegramBot(
             val chatId=notification.telegramId ?: sessions[notification.phone]?.telegramUserId
             if(chatId==null) { backendApi.reportNotification(notification.id,false);continue }
             val delivered=runCatching {
-                telegramApi.sendMessage(chatId,"Доступен новый VPN-сервер: ${notification.serverName} · ${notification.location}\nМожно выпустить недостающие конфигурации для всех своих устройств одним действием.",TelegramKeyboards.inline(
+                val text = buildString {
+                    appendLine("Доступен новый VPN-сервер: ${notification.serverName} · ${notification.location}")
+                    notification.comment?.takeIf { it.isNotBlank() }?.let { appendLine(); appendLine(it) }
+                    appendLine()
+                    append("Можно выпустить недостающие конфигурации для всех своих устройств одним действием.")
+                }
+                telegramApi.sendMessage(chatId, text, TelegramKeyboards.inline(
                     listOf(InlineButton("Выпустить для всех моих устройств","bulk:${notification.serverId}")),
                     listOf(InlineButton("Открыть конфигурации",url="https://vpn.oksiuta.ru/configurations?server=${notification.serverId}"))
                 ))
